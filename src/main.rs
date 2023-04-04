@@ -4,6 +4,7 @@
 // discord_app_id=your discord app id
 // discord_token="your discord bot token"
 use chatgpt::prelude::*;
+use chatgpt::types::CompletionResponse;
 use crab_gpt_bot::creds::CrabCredentials;
 use serenity::{
     async_trait,
@@ -35,15 +36,7 @@ impl EventHandler for Handler {
                 .trim()
                 .to_string();
             match self.bot_client.send_message(prompt).await {
-                Ok(response) => {
-                    if let Err(why) = msg
-                        .channel_id
-                        .say(&ctx.http, &response.message().content)
-                        .await
-                    {
-                        println!("Error sending message: {:?}", why);
-                    }
-                }
+                Ok(response) => Self::send_long_message(response, &msg, &ctx).await,
                 Err(why) => {
                     println!("Error fetching OpenAI completion: {:?}", why);
                 }
@@ -54,6 +47,33 @@ impl EventHandler for Handler {
     async fn ready(&self, _: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
     }
+}
+
+impl Handler {
+    async fn send_long_message(content: CompletionResponse, msg: &Message, ctx: &Context) {
+        let chunk_size = 1999; // Discord character limit
+        for chunk in content.message().content.chars().collect::<Vec<_>>().chunks(chunk_size) {
+            let chunk_str = chunk.iter().collect::<String>();
+            let mut remaining = &chunk_str[..];
+            while !remaining.is_empty() {
+                let end = remaining.char_indices()
+                    .take(chunk_size)
+                    .map(|(i, _)| i)
+                    .last()
+                    .unwrap_or(remaining.len());
+                let chunk = &remaining[..end];
+                if chunk.is_empty() {
+                    break;
+                } else {
+                    remaining = &remaining[end..];
+                    if let Err(why) = msg.channel_id.say(&ctx.http, &chunk).await {
+                        println!("Error sending message: {:?}", why);
+                    }
+                }
+            }
+    }
+}
+
 }
 
 #[tokio::main]
