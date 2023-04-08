@@ -15,24 +15,25 @@ use serenity::{
 
 struct Handler {
     bot_client: ChatGPT,
+    trigger_phrase: String,
 }
 
 impl Handler {
     pub fn new(bot_creds: CrabCredentials) -> Self {
         let bot_client = ChatGPT::new(bot_creds.openai_api_key)
             .expect("[error] Unable to create ChatGPT client");
-        Self { bot_client }
+        Self { bot_client, trigger_phrase: bot_creds.trigger_phrase.unwrap_or("yo crabby".to_string()) }
     }
 }
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content.to_lowercase().starts_with("yo crabby") {
+        if msg.content.to_lowercase().starts_with(&self.trigger_phrase) {
             let prompt = msg
                 .content
                 .to_lowercase()
-                .trim_start_matches("yo crabby")
+                .trim_start_matches(&self.trigger_phrase)
                 .trim()
                 .to_string();
             match self.bot_client.send_message(prompt).await {
@@ -80,7 +81,7 @@ impl Handler {
 async fn main() {
     let creds = CrabCredentials::new();
     let handler = Handler::new(creds.clone());
-    let framework = StandardFramework::new().configure(|c| c.prefix("yo crabby"));
+    let framework = StandardFramework::new().configure(|c| c.prefix(&handler.trigger_phrase));
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
     let mut client = Client::builder(creds.discord_token, intents)
         .application_id(creds.discord_app_id)

@@ -7,6 +7,7 @@ pub struct CrabCredentials {
     pub discord_token: String,
     pub discord_name: String,
     pub openai_api_key: String,
+    pub trigger_phrase: Option<String>,
 }
 
 impl CrabCredentials {
