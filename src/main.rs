@@ -5,7 +5,7 @@
 // discord_token="your discord bot token"
 use chatgpt::prelude::*;
 use chatgpt::types::CompletionResponse;
-use crab_gpt_bot::creds::CrabCredentials;
+use crab_gpt_bot::creds::SirCredentials;
 use serenity::{
     async_trait,
     framework::standard::StandardFramework,
@@ -19,10 +19,28 @@ struct Handler {
 }
 
 impl Handler {
-    pub fn new(bot_creds: CrabCredentials) -> Self {
-        let bot_client = ChatGPT::new(bot_creds.openai_api_key)
-            .expect("[error] Unable to create ChatGPT client");
-        Self { bot_client, trigger_phrase: bot_creds.trigger_phrase.unwrap_or("yo crabby".to_string()) }
+    pub fn new(bot_creds: SirCredentials) -> Self {
+        let bot_client = ChatGPT::new_with_config(
+            bot_creds.openai_api_key,
+            ModelConfigurationBuilder::default()
+                .temperature(bot_creds.temperature)
+                .engine(Self::map_engine(bot_creds.engine))
+                .build()
+                .expect("[error] Unable to create GPT ModelConfiguration"),
+        ).expect("[error] Unable to create ChatGPT client");
+        Self { bot_client, trigger_phrase: bot_creds.trigger_phrase }
+    }
+
+    pub fn map_engine(engine: String) -> ChatGPTEngine {
+        match engine.as_str() {
+            "Gpt35Turbo" => ChatGPTEngine::Gpt35Turbo,
+            "Gpt35Turbo_0301" => ChatGPTEngine::Gpt35Turbo_0301,
+            "Gpt4" => ChatGPTEngine::Gpt4,
+            "Gpt4_32k" => ChatGPTEngine::Gpt4_32k,
+            "Gpt4_0314" => ChatGPTEngine::Gpt4_0314,
+            "Gpt4_32k_0314" => ChatGPTEngine::Gpt4_32k_0314,
+            _ => ChatGPTEngine::Gpt35Turbo,
+        }
     }
 }
 
@@ -79,7 +97,7 @@ impl Handler {
 
 #[tokio::main]
 async fn main() {
-    let creds = CrabCredentials::new();
+    let creds = SirCredentials::new();
     let handler = Handler::new(creds.clone());
     let framework = StandardFramework::new().configure(|c| c.prefix(&handler.trigger_phrase));
     let intents = GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT;
